@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worvex — English Text Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+:root {
+    --bg: #030712;
+    --navy-dark: #0b1329;
+    --navy-panel: #0f1c3f;
+    --navy-border: #1e2e5c;
+    --navy-light: #3b82f6;
+    --text-white: #ffffff;
+    --text-muted: #94a3b8;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --shadow: 0 20px 60px rgba(0,0,0,.7);
+}
+body {
+    margin: 0; background: radial-gradient(circle at top left, #0f1c3f, transparent 40%), var(--bg);
+    color: var(--text-white); font-family: Inter, -apple-system, sans-serif; min-height: 100vh;
+}
+button, textarea { font: inherit; }
+button { cursor: pointer; }
+.app { width: min(1180px, calc(100% - 32px)); margin: auto; padding: 28px 0 60px; }
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 25px; }
+.logo-mark { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.logo-mark svg { width: 100%; height: 100%; display: block; }
+.logo-text { font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.8px; }
+.hero { background: var(--navy-dark); border: 1px solid var(--navy-border); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); }
+textarea { width: 100%; min-height: 180px; padding: 18px; border-radius: 16px; border: 1px solid var(--navy-border); outline: none; background: #020617; color: #ffffff; line-height: 1.7; font-size: 16px; }
+textarea::placeholder { color: #475569; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.btn { border: 1px solid var(--navy-border); background: var(--navy-panel); color: #ffffff; border-radius: 12px; padding: 11px 16px; font-weight: 700; display: inline-flex; align-items: center; cursor: pointer; }
+.btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); border-color: transparent; }
+.btn-danger { background: #020617; color: #ffffff; border-color: #334155; }
+.status { display: none; align-items: center; gap: 9px; color: var(--text-muted); margin-top: 15px; font-size: 14px; }
+.status.show { display: flex; }
+.loader { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--navy-border); border-top-color: var(--navy-light); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+.stat { background: var(--navy-dark); border: 1px solid var(--navy-border); border-radius: 16px; padding: 16px; }
+.stat-label { color: var(--text-muted); font-size: 12px; margin-bottom: 6px; }
+.stat-value { font-size: 22px; font-weight: 800; color: #ffffff; }
+.level-a { color: var(--green); } .level-b { color: var(--yellow); } .level-c { color: var(--red); }
+.result-section { margin-top: 22px; background: var(--navy-dark); border: 1px solid var(--navy-border); border-radius: 24px; padding: 24px; display: none; }
+.result-section.show { display: block; }
+.text-result { background: #020617; border: 1px solid var(--navy-border); border-radius: 18px; padding: 20px; line-height: 2.1; font-size: 17px; }
+.word { cursor: pointer; border-radius: 5px; padding: 2px 4px; transition: .15s; font-weight: 500; }
+.word:hover { background: rgba(255,255,255,.15); }
+.word-a { color: var(--green); } .word-b { color: var(--yellow); } .word-c { color: var(--red); }
+.word-card { margin-top: 20px; background: #020617; border: 1px solid var(--navy-border); border-radius: 18px; padding: 22px; display: none; }
+.word-card.show { display: block; }
+.word-head { display: flex; justify-content: space-between; align-items: center; }
+.selected-word { margin: 0; font-size: 28px; color: #ffffff; }
+.audio-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--navy-border); background: var(--navy-panel); color: #ffffff; font-size: 18px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.info-box { background: var(--navy-panel); border: 1px solid var(--navy-border); border-radius: 14px; padding: 14px; margin-top: 10px; }
+.info-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 5px; }
+.info-value { line-height: 1.5; font-size: 15px; color: #ffffff; }
+.example { color: #cbd5e1; font-style: italic; }
+.legend { display: flex; gap: 18px; margin-top: 18px; color: var(--text-muted); font-size: 13px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot-a { background: var(--green); } .dot-b { background: var(--yellow); } .dot-c { background: var(--red); }
+input[type="file"] { display: none; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } .info-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+<header>
+    <div class="logo-mark">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="premGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffffff"/>
+                    <stop offset="50%" stop-color="#93c5fd"/>
+                    <stop offset="100%" stop-color="#1d4ed8"/>
+                </linearGradient>
+                <linearGradient id="premGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#3b82f6"/>
+                    <stop offset="70%" stop-color="#1e3a8a"/>
+                    <stop offset="100%" stop-color="#020617"/>
+                </linearGradient>
+            </defs>
+            <rect x="3" y="3" width="94" height="94" rx="26" fill="#091124" stroke="#1e2e5c" stroke-width="2"/>
+            <rect x="4" y="4" width="92" height="92" rx="25" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <path d="M22 28 L38 72 L50 48 L41 28 Z" fill="url(#premGrad1)"/>
+            <path d="M78 28 L62 72 L50 48 L59 28 Z" fill="url(#premGrad2)"/>
+            <path d="M50 48 L41 28 L59 28 Z" fill="#ffffff" opacity="0.9"/>
+            <path d="M38 72 L50 48 L62 72 Z" fill="#0b1329" stroke="#3b82f6" stroke-width="1.5"/>
+        </svg>
+    </div>
+    <div><div class="logo-text">WORVEX</div></div>
+</header>
+
+<section class="hero">
+    <textarea id="textInput" placeholder="Type or paste your English text here..."></textarea>
+    <div class="controls">
+        <button class="btn btn-primary" id="analyzeBtn">Analyze Text</button>
+        <label class="btn">Camera <input type="file" id="cameraInput" accept="image/*" capture="environment"></label>
+        <label class="btn">Gallery <input type="file" id="galleryInput" accept="image/*"></label>
+        <button class="btn btn-danger" id="clearBtn">Clear</button>
+    </div>
+    <div class="status" id="status"><div class="loader"></div><span id="statusText">Analyzing...</span></div>
+</section>
+
+<section class="stats">
+    <div class="stat"><div class="stat-label">A1–A2</div><div class="stat-value level-a" id="aPercent">0%</div></div>
+    <div class="stat"><div class="stat-label">B1–B2</div><div class="stat-value level-b" id="bPercent">0%</div></div>
+    <div class="stat"><div class="stat-label">C1–C2</div><div class="stat-value level-c" id="cPercent">0%</div></div>
+    <div class="stat"><div class="stat-label">Overall Level</div><div class="stat-value" id="overallLevel">—</div></div>
+</section>
+
+<section class="result-section" id="resultSection">
+    <div class="text-result" id="textResult"></div>
+    <div class="legend">
+        <div><span class="dot dot-a"></span>A1–A2</div>
+        <div><span class="dot dot-b"></span>B1–B2</div>
+        <div><span class="dot dot-c"></span>C1–C2</div>
+    </div>
+    <div class="word-card" id="wordCard">
+        <div class="word-head">
+            <h2 class="selected-word" id="selectedWord">—</h2>
+            <button class="audio-btn" id="audioBtn">Sound</button>
+        </div>
+        <div class="info-grid">
+            <div class="info-box"><div class="info-label">Level</div><div class="info-value" id="wordLevel">—</div></div>
+            <div class="info-box"><div class="info-label">Pronunciation</div><div class="info-value" id="wordPronunciation">-</div></div>
+        </div>
+        <div class="info-box"><div class="info-label">Definition</div><div class="info-value" id="wordDefinition">-</div></div>
+        <div class="info-box"><div class="info-label">Example</div><div class="info-value example" id="wordExample">-</div></div>
+    </div>
+</section>
+</div>
+
+<script>
+const GEMINI_API_KEY = "AQ.Ab8RN6LXO0rH84QKJ1Stij_LayQt4Ki2UoyKzh40VTxqwvKgpQ";
+const GEMINI_MODEL = "gemini-2.5-flash";
+
+const textInput = document.getElementById("textInput");
+const analyzeBtn = document.getElementById("analyzeBtn");
+const clearBtn = document.getElementById("clearBtn");
+const cameraInput = document.getElementById("cameraInput");
+const galleryInput = document.getElementById("galleryInput");
+const status = document.getElementById("status");
+const statusText = document.getElementById("statusText");
+const resultSection = document.getElementById("resultSection");
+const textResult = document.getElementById("textResult");
+const aPercent = document.getElementById("aPercent");
+const bPercent = document.getElementById("bPercent");
+const cPercent = document.getElementById("cPercent");
+const overallLevel = document.getElementById("overallLevel");
+const wordCard = document.getElementById("wordCard");
+const selectedWord = document.getElementById("selectedWord");
+const wordLevel = document.getElementById("wordLevel");
+const wordPronunciation = document.getElementById("wordPronunciation");
+const wordDefinition = document.getElementById("wordDefinition");
+const wordExample = document.getElementById("wordExample");
+const audioBtn = document.getElementById("audioBtn");
+
+const wordCache = new Map();
+let currentWord = "";
+
+const CEFR = {
+    A1: new Set(`a an the teacher learn help student book pen school study read write day time see go come do make`.split(/\s+/)),
+    B1: new Set(`concept explain dedicated effective complex develop manage support achieve create`.split(/\s+/)),
+    C1: new Set(`paradigm ubiquitous pragmatic ephemeral ambiguity resilience sophisticated`.split(/\s+/))
+};
+
+function normalize(w) { return w.toLowerCase().replace(/^[^a-z]+|[^a-z]+$/gi, "").trim(); }
+function getCEFR(w) {
+    const s = normalize(w);
+    if (CEFR.A1.has(s) || s.length <= 4) return "A1";
+    if (CEFR.C1.has(s) || s.length >= 9) return "C1";
+    return "B1";
+}
+function levelGroup(lvl) { return lvl.startsWith("A") ? "A" : (lvl.startsWith("B") ? "B" : "C"); }
+
+function analyzeText() {
+    const text = textInput.value.trim();
+    if (!text) { resultSection.classList.remove("show"); return; }
+
+    let a = 0, b = 0, c = 0;
+    textResult.innerHTML = text.replace(/[A-Za-z]+(?:['’-][A-Za-z]+)*/g, function(match) {
+        const lvl = getCEFR(match);
+        const grp = levelGroup(lvl);
+        if (grp === "A") a++; else if (grp === "B") b++; else c++;
+        return `<span class="word word-${grp.toLowerCase()}" data-word="${normalize(match)}">${match}</span>`;
+    });
+
+    const tot = a + b + c || 1;
+    aPercent.textContent = Math.round((a/tot)*100) + "%";
+    bPercent.textContent = Math.round((b/tot)*100) + "%";
+    cPercent.textContent = Math.round((c/tot)*100) + "%";
+    overallLevel.textContent = c > a ? "C1" : (b > a ? "B1" : "A2");
+    resultSection.classList.add("show");
+}
+
+function speakWord(w) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(w);
+    u.lang = "en-US";
+    window.speechSynthesis.speak(u);
+}
+
+async function getGemini(word) {
+    const prompt = `Analyze "${word}". Return ONLY JSON: {"pronunciation": "IPA", "definition": "1 short English definition", "example": "1 example sentence"}`;
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) return null;
+        const d = await res.json();
+        const raw = d.candidates?.[0]?.content?.parts?.[0]?.text;
+        return JSON.parse(raw.replace(/```json|```/g, "").trim());
+    } catch {
+        return null;
+    }
+}
+
+async function showWord(word) {
+    currentWord = word;
+    selectedWord.textContent = word;
+    wordCard.classList.add("show");
+    wordLevel.textContent = getCEFR(word);
+    wordPronunciation.textContent = "Loading...";
+    wordDefinition.textContent = "Loading...";
+    wordExample.textContent = "Loading...";
+    speakWord(word);
+
+    if (wordCache.has(word)) {
+        const c = wordCache.get(word);
+        wordPronunciation.textContent = c.pronunciation;
+        wordDefinition.textContent = c.definition;
+        wordExample.textContent = c.example;
+        return;
+    }
+
+    let result = await getGemini(word);
+    if (!result) {
+        result = {
+            pronunciation: `/${word}/`,
+            definition: `A person or thing associated with "${word}".`,
+            example: `The word "${word}" is used in everyday English sentences.`
+        };
+    }
+
+    wordCache.set(word, result);
+    wordPronunciation.textContent = result.pronunciation || `/${word}/`;
+    wordDefinition.textContent = result.definition || "Definition not found.";
+    wordExample.textContent = result.example || "-";
+}
+
+textResult.addEventListener("click", e => {
+    const el = e.target.closest(".word");
+    if (el) showWord(el.dataset.word);
+});
+
+audioBtn.addEventListener("click", () => speakWord(currentWord));
+analyzeBtn.addEventListener("click", analyzeText);
+clearBtn.addEventListener("click", () => {
+    textInput.value = ""; resultSection.classList.remove("show"); wordCard.classList.remove("show");
+});
+
+async function handleOcr(file) {
+    if (!file) return;
+    status.classList.add("show");
+    statusText.textContent = "Scanning image...";
+    try {
+        const res = await Tesseract.recognize(file, "eng");
+        textInput.value = res.data.text.trim();
+        analyzeText();
+    } catch {
+        statusText.textContent = "Could not read the image.";
+        setTimeout(() => status.classList.remove("show"), 2500);
+        return;
+    }
+    status.classList.remove("show");
+}
+
+cameraInput.addEventListener("change", e => {
+    handleOcr(e.target.files?.[0]);
+    e.target.value = "";
+});
+
+galleryInput.addEventListener("change", e => {
+    handleOcr(e.target.files?.[0]);
+    e.target.value = "";
+});
+</script>
+</body>
+</html>
